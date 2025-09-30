@@ -139,9 +139,30 @@ def csv_to_config(csv_path: str, output_path: str = None) -> str:
     stops = df.iloc[2].tolist()
     steps = df.iloc[3].tolist()
     
-    # Identify input parameters (first 8 columns, skipping the first unnamed column) and objectives (last 3 columns)
-    input_params = column_names[1:9]  # Skip first column, take next 8 columns
-    objective_params = column_names[-3:]  # Last 3 columns are objectives
+    # Identify input parameters and objectives by finding the empty column separator
+    # Skip the first unnamed column, then find where empty columns start
+    input_params = []
+    objective_params = []
+    
+    # Start from column 1 (skip first unnamed column)
+    i = 1
+    while i < len(column_names):
+        col_name = column_names[i]
+        # Check if this is an empty column (NaN, empty string, or pandas unnamed column)
+        if (pd.isna(col_name) or 
+            str(col_name).strip() == "" or 
+            str(col_name).startswith("Unnamed:")):
+            # Found the separator - everything after this is objectives
+            objective_params = [col for col in column_names[i+1:] 
+                              if not (pd.isna(col) or str(col).strip() == "" or str(col).startswith("Unnamed:"))]
+            break
+        else:
+            input_params.append(col_name)
+        i += 1
+    
+    # If no separator found, assume all remaining columns are objectives
+    if not objective_params:
+        objective_params = [col for col in column_names[len(input_params)+1:] if not (pd.isna(col) or str(col).strip() == "")]
     
     # Build the config dictionary
     config = {
@@ -162,8 +183,13 @@ def csv_to_config(csv_path: str, output_path: str = None) -> str:
         if pd.isna(param) or str(param).strip() == "":
             continue
             
-        # Get corresponding metadata (adjust index to account for skipping first column)
-        metadata_idx = i + 1  # +1 because we skipped the first column
+        # Find the column index in the original column_names list
+        try:
+            metadata_idx = column_names.index(param)
+        except ValueError:
+            # Fallback: use position-based indexing
+            metadata_idx = i + 1  # +1 because we skipped the first column
+            
         unit = units[metadata_idx] if metadata_idx < len(units) else ""
         start = starts[metadata_idx] if metadata_idx < len(starts) else 0.0
         stop = stops[metadata_idx] if metadata_idx < len(stops) else 1.0
