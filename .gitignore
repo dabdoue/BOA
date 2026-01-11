@@ -56,3 +56,6 @@ Desktop.ini
 .nox/
 .pytest_cache/
 htmlcov/
+
+# artifacts
+artifacts/

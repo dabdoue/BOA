@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  # ==========================================================================
+  # BOA Server
+  # ==========================================================================
+  boa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: boa-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - boa-data:/app/data
+      - boa-artifacts:/app/artifacts
+    environment:
+      - BOA_DATABASE_URL=sqlite:////app/data/boa.db
+      - BOA_ARTIFACTS_DIR=/app/artifacts
+      - BOA_HOST=0.0.0.0
+      - BOA_PORT=8000
+      - BOA_DEBUG=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # ==========================================================================
+  # BOA with PostgreSQL (production)
+  # ==========================================================================
+  boa-postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: boa-postgres-server
+    ports:
+      - "8001:8000"
+    volumes:
+      - boa-artifacts-pg:/app/artifacts
+    environment:
+      - BOA_DATABASE_URL=postgresql://boa:boa@postgres:5432/boa
+      - BOA_ARTIFACTS_DIR=/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: boa-postgres
+    environment:
+      - POSTGRES_USER=boa
+      - POSTGRES_PASSWORD=boa
+      - POSTGRES_DB=boa
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U boa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - postgres
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  boa-data:
+    name: boa-data
+  boa-artifacts:
+    name: boa-artifacts
+  boa-artifacts-pg:
+    name: boa-artifacts-pg
+  postgres-data:
+    name: boa-postgres-data
+
+
+
+
+
